@@ -92,4 +92,108 @@
         const statusTranslations = {
             'loading tesseract core': 'กำลังโหลดโครงสร้างระบบ...',
             'initializing tesseract': 'กำลังเปิดใช้งานฮาร์ดแวร์เร่งความเร็ว...',
-            'loading language traineddata': 'กำลังโหลดหน่วยความจำภาษา (ไทย
+            'loading language traineddata': 'กำลังโหลดหน่วยความจำภาษา (ไทย/อังกฤษ)...',
+            'initializing api': 'พร้อมใช้งานแล้ว!',
+            'recognizing text': 'กำลังสแกนตัวอักษรอย่างรวดเร็ว...'
+        };
+
+        // 1. SAFE PRE-WARM ENGINE PIPELINE (Tesseract.js v5 Compliant)
+        async function initEngine() {
+            try {
+                // Instantiating background pipeline layout safely
+                ocrWorker = await Tesseract.createWorker({
+                    logger: message => {
+                        const messageStr = message.status;
+                        if (messageStr === 'loading language traineddata' || messageStr === 'loading tesseract core' || messageStr === 'initializing tesseract') {
+                            updateProgress(statusTranslations[messageStr] || messageStr, message.progress || 0);
+                        }
+                    }
+                });
+
+                // Explicitly loading matching datasets in distinct sequential promises
+                await ocrWorker.loadLanguage('tha+eng');
+                await ocrWorker.initialize('tha+eng');
+
+                // Update system components to activate the frontend UI interactions
+                badge.textContent = "Ready / พร้อมใช้งาน";
+                badge.classList.replace('bg-amber-100', 'bg-green-100');
+                badge.classList.replace('text-amber-800', 'text-green-800');
+                
+                statusContainer.classList.add('hidden');
+                imageInput.removeAttribute('disabled');
+                outputText.placeholder = "พร้อมแล้ว! วางหรืออัปโหลดรูปภาพเพื่อสแกนทันที...";
+            } catch (err) {
+                console.error("Initialization failed", err);
+                statusText.textContent = "การโหลดเครื่องยนต์ล้มเหลว: " + err.message;
+            }
+        }
+
+        // Run engine initialization immediately when the webpage displays
+        initEngine();
+
+        // 2. FILE SELECTION EVENT
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                imagePreview.src = event.target.result;
+                imagePreview.classList.remove('hidden');
+                previewPlaceholder.classList.add('hidden');
+                
+                // Process utilizing the warm, active memory worker thread
+                processOCRFast(event.target.result);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // 3. RAPID OCR PROCESSOR 
+        async function processOCRFast(imageSrc) {
+            outputText.value = "";
+            copyBtn.classList.add('hidden');
+            statusContainer.classList.remove('hidden');
+            updateProgress('กำลังดึงข้อมูลพิกเซล...', 0);
+
+            try {
+                // Target recognition pipeline instantly with precompiled caches
+                const { data: { text } } = await ocrWorker.recognize(imageSrc, {}, {
+                    logger: message => {
+                        if (message.status === 'recognizing text') {
+                            updateProgress(statusTranslations[message.status], message.progress);
+                        }
+                    }
+                });
+
+                if (text && text.trim().length > 0) {
+                    outputText.value = text;
+                    copyBtn.classList.remove('hidden');
+                } else {
+                    outputText.value = "ไม่พบตัวอักษรในรูปภาพนี้";
+                }
+            } catch (error) {
+                console.error("OCR Execution Error:", error);
+                outputText.value = `เกิดข้อผิดพลาด: ${error.message}`;
+            } finally {
+                statusContainer.classList.add('hidden');
+            }
+        }
+
+        function updateProgress(statusMessage, progressFraction) {
+            const percent = Math.round(progressFraction * 100);
+            statusText.textContent = statusMessage;
+            progressBar.style.width = `${percent}%`;
+            progressPercentage.textContent = `${percent}%`;
+        }
+
+        // Copy functionality
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(outputText.value).then(() => {
+                const prev = copyBtn.textContent;
+                copyBtn.textContent = "คัดลอกแล้ว! ✓";
+                setTimeout(() => copyBtn.textContent = prev, 2000);
+            });
+        });
+    </script>
+</body>
+</html>
