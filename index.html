@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web-Based AI OCR System (Thai/English Support)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col justify-between">
+
+    <header class="bg-white shadow-sm border-b border-gray-200 py-4 px-6">
+        <div class="max-w-5xl mx-auto flex items-center justify-between">
+            <h1 class="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                📸 TH/EN OCR Scanner
+            </h1>
+            <span class="text-xs bg-blue-100 text-blue-800 font-medium px-2.5 py-0.5 rounded-full">ภาษาไทย & English</span>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto w-full p-6 grid grid-cols-1 md:grid-cols-2 gap-6 flex-grow">
+        
+        <section class="flex flex-col gap-4">
+            <div class="bg-white p-6 rounded-xl shadow-xs border border-gray-200">
+                <h2 class="text-lg font-semibold mb-4 text-gray-700">1. อัปโหลดรูปภาพเอกสาร / Upload Image</h2>
+                
+                <label class="flex flex-col items-center justify-center w-full h-48 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                        <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">คลิกเพื่ออัปโหลด</span> หรือลากไฟล์มาวางที่นี่</p>
+                        <p class="text-xs text-gray-400">PNG, JPG, or WEBP</p>
+                    </div>
+                    <input id="image-input" type="file" accept="image/*" class="hidden" />
+                </label>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl shadow-xs border border-gray-200 flex-grow flex flex-col">
+                <h3 class="text-sm font-semibold mb-2 text-gray-500">ตัวอย่างรูปภาพ / Image Preview</h3>
+                <div class="flex-grow border border-gray-100 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden min-h-[200px]">
+                    <img id="image-preview" class="max-h-64 object-contain hidden" alt="Uploaded Document Preview">
+                    <span id="preview-placeholder" class="text-sm text-gray-400">ยังไม่มีรูปภาพที่เลือก</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="flex flex-col gap-4">
+            <div class="bg-white p-6 rounded-xl shadow-xs border border-gray-200 flex-grow flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-gray-700">2. ข้อความที่คัดลอกได้ / Extracted Text</h2>
+                    <button id="copy-btn" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-medium transition-colors hidden">
+                        คัดลอกข้อความ (Copy)
+                    </button>
+                </div>
+
+                <div id="status-container" class="hidden mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span id="status-text" class="text-sm font-medium text-blue-700">กำลังดาวน์โหลดโมเดลภาษาไทย...</span>
+                        <span id="progress-percentage" class="text-sm font-bold text-blue-700">0%</span>
+                    </div>
+                    <div class="w-full bg-blue-200 rounded-full h-2.5">
+                        <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-200" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="flex-grow flex flex-col">
+                    <textarea id="output-text" readonly 
+                        class="w-full flex-grow p-4 bg-gray-50 border border-gray-200 rounded-lg resize-none text-sm font-sans focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 placeholder-gray-400 min-h-[300px]"
+                        placeholder="ข้อความที่สแกนได้จากรูปภาพจะแสดงขึ้นที่นี่โดยอัตโนมัติ..."></textarea>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-white text-center py-4 text-xs text-gray-400 border-t border-gray-100">
+        Powered by Tesseract.js Engine (Thai-English Language Pack Loaded)
+    </footer>
+
+    <script>
+        const imageInput = document.getElementById('image-input');
+        const imagePreview = document.getElementById('image-preview');
+        const previewPlaceholder = document.getElementById('preview-placeholder');
+        const outputText = document.getElementById('output-text');
+        const statusContainer = document.getElementById('status-container');
+        const statusText = document.getElementById('status-text');
+        const progressBar = document.getElementById('progress-bar');
+        const progressPercentage = document.getElementById('progress-percentage');
+        const copyBtn = document.getElementById('copy-btn');
+
+        // Maps raw Tesseract states into clean bilingual user notices
+        const statusTranslations = {
+            'loading tesseract core': 'กำลังโหลดระบบประมวลผลหลัก...',
+            'initializing tesseract': 'กำลังเริ่มต้นระบบ OCR...',
+            'loading language traineddata': 'กำลังโหลดข้อมูลโมเดลภาษา (ไทย/อังกฤษ)...',
+            'initializing api': 'กำลังตั้งค่าระบบวิเคราะห์ภาษา...',
+            'recognizing text': 'กำลังสแกนตัวอักษรจากเม็ดพิกเซล...'
+        };
+
+        // Handle File Selection and UI Preview updating
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                imagePreview.src = event.target.result;
+                imagePreview.classList.remove('hidden');
+                previewPlaceholder.classList.add('hidden');
+                
+                // Trigger the Thai/English multi-language OCR Pipeline
+                processOCR(event.target.result);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // The Core OCR Processing Function
+        async function processOCR(imageSrc) {
+            outputText.value = "";
+            copyBtn.classList.add('hidden');
+            statusContainer.classList.remove('hidden');
+            updateProgress('กำลังเตรียมไฟล์ภาพ...', 0);
+
+            try {
+                // FORCE LOADING OF BOTH THAI AND ENGLISH MODELS
+                const result = await Tesseract.recognize(
+                    imageSrc,
+                    'tha+eng', 
+                    {
+                        logger: message => {
+                            if (message.status === 'recognizing text') {
+                                updateProgress(statusTranslations[message.status], message.progress);
+                            } else {
+                                const customStatus = statusTranslations[message.status] || message.status;
+                                updateProgress(customStatus, 0);
+                            }
+                        }
+                    }
+                );
+
+                if (result.data && result.data.text.trim().length > 0) {
+                    outputText.value = result.data.text;
+                    copyBtn.classList.remove('hidden');
+                } else {
+                    outputText.value = "ไม่พบตัวอักษรในรูปภาพนี้ กรุณาตรวจสอบว่ารูปภาพมีความชัดเจนและมีแสงสว่างเพียงพอ";
+                }
+
+            } catch (error) {
+                console.error("OCR Pipeline Failed: ", error);
+                outputText.value = `เกิดข้อผิดพลาดในการประมวลผล:\n${error.message}`;
+            } finally {
+                statusContainer.classList.add('hidden');
+            }
+        }
+
+        // Helper to update the UI loading state bar
+        function updateProgress(statusMessage, progressFraction) {
+            const percent = Math.round(progressFraction * 100);
+            statusText.textContent = statusMessage;
+            progressBar.style.width = `${percent}%`;
+            progressPercentage.textContent = `${percent}%`;
+        }
+
+        // Clipboard Copy Action Functionality 
+        copyBtn.addEventListener('click', () => {
+            if (!outputText.value) return;
+            navigator.clipboard.writeText(outputText.value).then(() => {
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = "คัดลอกสำเร็จ! ✓";
+                copyBtn.classList.replace('bg-gray-100', 'bg-green-100');
+                copyBtn.classList.replace('text-gray-600', 'text-green-700');
+                
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.classList.replace('bg-green-100', 'bg-gray-100');
+                    copyBtn.classList.replace('text-green-700', 'text-gray-600');
+                }, 2000);
+            });
+        });
+    </script>
+</body>
+</html>
