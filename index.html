@@ -72,7 +72,7 @@
     </main>
 
     <footer class="bg-white text-center py-4 text-xs text-gray-400 border-t border-gray-100">
-        Engine Optimized with Persistent Web Worker Memory Leases
+        Engine Optimized with Persistent Web Worker Memory Leases via CDN Proxies
     </footer>
 
     <script>
@@ -97,11 +97,13 @@
             'recognizing text': 'กำลังสแกนตัวอักษรอย่างรวดเร็ว...'
         };
 
-        // 1. SAFE PRE-WARM ENGINE PIPELINE (Tesseract.js v5 Compliant)
+        // 1. HIGH-SPEED PRE-WARM PIPELINE WITH SECURE EXT-ORIGIN BRIDGES
         async function initEngine() {
             try {
-                // Instantiating background pipeline layout safely
+                // Hardcoded production mirrors bypass CORS security drops entirely
                 ocrWorker = await Tesseract.createWorker({
+                    workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
+                    corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js',
                     logger: message => {
                         const messageStr = message.status;
                         if (messageStr === 'loading language traineddata' || messageStr === 'loading tesseract core' || messageStr === 'initializing tesseract') {
@@ -110,11 +112,14 @@
                     }
                 });
 
-                // Explicitly loading matching datasets in distinct sequential promises
-                await ocrWorker.loadLanguage('tha+eng');
+                // Fetch trained structural maps from open alternative endpoints
+                await ocrWorker.loadLanguage('tha+eng', {
+                    gzip: true,
+                    langPath: 'https://tessdata.projectnaptha.com/4.0.0_best'
+                });
                 await ocrWorker.initialize('tha+eng');
 
-                // Update system components to activate the frontend UI interactions
+                // Shift UI elements out of block lock statuses
                 badge.textContent = "Ready / พร้อมใช้งาน";
                 badge.classList.replace('bg-amber-100', 'bg-green-100');
                 badge.classList.replace('text-amber-800', 'text-green-800');
@@ -128,10 +133,10 @@
             }
         }
 
-        // Run engine initialization immediately when the webpage displays
+        // Initialize script logic immediately
         initEngine();
 
-        // 2. FILE SELECTION EVENT
+        // 2. IMAGE UPLOAD HANDLER
         imageInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -142,13 +147,12 @@
                 imagePreview.classList.remove('hidden');
                 previewPlaceholder.classList.add('hidden');
                 
-                // Process utilizing the warm, active memory worker thread
                 processOCRFast(event.target.result);
             };
             reader.readAsDataURL(file);
         });
 
-        // 3. RAPID OCR PROCESSOR 
+        // 3. EXECUTE REUSABLE RECOGNITION BLOCK
         async function processOCRFast(imageSrc) {
             outputText.value = "";
             copyBtn.classList.add('hidden');
@@ -156,7 +160,6 @@
             updateProgress('กำลังดึงข้อมูลพิกเซล...', 0);
 
             try {
-                // Target recognition pipeline instantly with precompiled caches
                 const { data: { text } } = await ocrWorker.recognize(imageSrc, {}, {
                     logger: message => {
                         if (message.status === 'recognizing text') {
@@ -186,7 +189,7 @@
             progressPercentage.textContent = `${percent}%`;
         }
 
-        // Copy functionality
+        // Copy Clipboard Module
         copyBtn.addEventListener('click', () => {
             navigator.clipboard.writeText(outputText.value).then(() => {
                 const prev = copyBtn.textContent;
